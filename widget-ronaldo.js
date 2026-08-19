@@ -1013,13 +1013,17 @@
         });
 
         // Posiciona acima do botão de compra (WooCommerce: .single_add_to_cart_button dentro de form.cart)
-        const cartForm = document.querySelector('form.cart');
         const buyBtn = document.querySelector('.single_add_to_cart_button, form.cart button[type="submit"], .js-addtocart, .btn-add-to-cart, [data-component="product.add-to-cart"]');
-        if (cartForm) {
-            // acima da linha quantidade+comprar, nunca dentro dela
-            cartForm.parentNode.insertBefore(inlineBtn, cartForm);
+        // Ancora logo ACIMA da linha quantidade+comprar (.ct-cart-actions no Blocksy).
+        // Antes do form.cart inteiro ficava errado: o form começa nos swatches/frete.
+        const cartRow = buyBtn ? buyBtn.closest('.ct-cart-actions, .woocommerce-variation-add-to-cart') : null;
+        const cartForm = document.querySelector('form.cart');
+        if (cartRow && cartRow.parentNode) {
+            cartRow.parentNode.insertBefore(inlineBtn, cartRow);
         } else if (buyBtn) {
             buyBtn.parentNode.insertBefore(inlineBtn, buyBtn);
+        } else if (cartForm) {
+            cartForm.parentNode.insertBefore(inlineBtn, cartForm);
         } else {
             const variantsContainer = document.querySelector('form.cart, .js-product-variants');
             if (variantsContainer) {

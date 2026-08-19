@@ -302,7 +302,7 @@
             display: flex; align-items: center; justify-content: center; gap: 8px;
             width: 100%; padding: 12px 16px; min-height: 44px;
             background: transparent !important; color: var(--c-ink) !important;
-            border: 2px solid var(--c-ink) !important; border-radius: 5px !important;
+            border: 1px solid var(--c-ink) !important; border-radius: 5px !important;
             -webkit-appearance: none; appearance: none;
             font-family: inherit; font-size: 12px; font-weight: 700; letter-spacing: 1.2px; text-transform: uppercase;
             cursor: pointer; transition: background 0.2s, color 0.2s, transform 0.1s;
@@ -1030,6 +1030,20 @@
                 variantsContainer.parentNode.insertBefore(inlineBtn, variantsContainer);
             }
         }
+        // O Woo re-renderiza o bloco de variacao depois do load — re-ancora o botao
+        // na posicao certa (idempotente) em vez de confiar so na insercao inicial.
+        function plReanchorInline() {
+            try {
+                var b = document.querySelector('.q-btn-inline-provador');
+                var buy = document.querySelector('form.cart .single_add_to_cart_button') || document.querySelector('.single_add_to_cart_button');
+                var row = buy ? buy.closest('.ct-cart-actions, .woocommerce-variation-add-to-cart') : null;
+                if (b && row && row.parentNode && b.nextElementSibling !== row) row.parentNode.insertBefore(b, row);
+            } catch (e) {}
+        }
+        setTimeout(plReanchorInline, 600);
+        setTimeout(plReanchorInline, 2000);
+        setTimeout(plReanchorInline, 5000);
+
         const genBtn      = document.getElementById('q-btn-generate');
         const nextBtn     = null; // single-step flow — no next button
         const phoneStep   = null;

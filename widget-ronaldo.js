@@ -64,6 +64,68 @@
     const WEBHOOK_PIX = 'https://n8n.segredosdodrop.com/webhook/ronaldo-pix';
     const WEBHOOK_PIX_STATUS = 'https://n8n.segredosdodrop.com/webhook/ronaldo-pix-status';
     const WEBHOOK_CHECK_LIMIT = 'https://n8n.segredosdodrop.com/webhook/ronaldo-check-limit';
+    const WEBHOOK_BUY_CLICK = 'https://n8n.segredosdodrop.com/webhook/pl-provador-buy-click';
+
+    // ── CTA de compra no resultado (WooCommerce) — layout igual Gava/Cacife ──
+    function getMainPrice() {
+        var el = document.querySelector('p.price ins .amount') || document.querySelector('p.price .amount, .price .amount');
+        var t = el ? (el.textContent || '').trim() : '';
+        return (t && /\d/.test(t)) ? t.replace(/\s+/g, ' ') : '';
+    }
+    function findStoreBuyBtn() {
+        var el = document.querySelector('form.cart button.single_add_to_cart_button, .single_add_to_cart_button');
+        if (!el || el.disabled) return null;
+        var st = getComputedStyle(el);
+        if (st.display === 'none' || st.visibility === 'hidden' || st.opacity === '0') return null;
+        return el;
+    }
+    function buyNow() {
+        try {
+            var _tp = (document.getElementById('q-phone') || {}).value || '';
+            var _td = (document.querySelector('h1.product_title, h1') || {}).innerText || document.title || '';
+            fetch(WEBHOOK_BUY_CLICK, { method: 'POST', keepalive: true, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ phone: _tp, origin: location.origin, produto: _td }) }).catch(function () {});
+        } catch (e) {}
+        var sb = findStoreBuyBtn();
+        var adicionou = false;
+        if (sb) { try { sb.click(); adicionou = true; } catch (e) {} }
+        if (adicionou) {
+            var _b = document.getElementById('q-btn-buy-now'); if (_b) _b.style.display = 'none';
+            var _s = document.getElementById('q-buy-success'); if (_s) _s.style.display = 'flex';
+        } else {
+            // Sem botao nativo para acionar, dizer "adicionado" seria mentira: leva ao Comprar da pagina.
+            try { closeModal(); } catch (e) {}
+            try {
+                var alvo = document.querySelector('form.cart') || document.querySelector('h1');
+                if (alvo && alvo.scrollIntoView) alvo.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            } catch (e) {}
+        }
+    }
+    // Escassez deterministica por produto (decai ao longo do dia; piso 8)
+    function scarcityCount(name) {
+        var h = 5381, s = String(name || '');
+        for (var i = 0; i < s.length; i++) h = (h * 33 + s.charCodeAt(i)) >>> 0;
+        var FLOOR = 8, _st = 10 + (h % 4);
+        var _dn = new Date(), _df = (_dn.getHours() * 60 + _dn.getMinutes()) / 1440;
+        var _q = _st - Math.floor(_df * 5);
+        return _q < FLOOR ? FLOOR : _q;
+    }
+    function populateBuyCta() {
+        var btn = document.getElementById('q-btn-buy-now');
+        if (!btn) return;
+        var succ = document.getElementById('q-buy-success'); if (succ) succ.style.display = 'none';
+        var price = getMainPrice();
+        var prodName = ((document.querySelector('h1.product_title, h1') || {}).innerText || document.title || '').trim();
+        var nameEl = document.getElementById('q-result-prodname'); if (nameEl) nameEl.textContent = prodName;
+        var priceEl = document.getElementById('q-result-prodprice'); if (priceEl) priceEl.textContent = price || '';
+        var instEl = document.getElementById('q-result-installment');
+        if (instEl) { var _pe = document.querySelector('[class*="parcel"], .woocommerce-Price-installments'); var _i = _pe ? _pe.textContent.replace(/\s+/g, ' ').trim() : ''; if (!/\dx/.test(_i)) _i = ''; instEl.textContent = _i; instEl.style.display = _i ? 'block' : 'none'; }
+        var info = document.getElementById('q-result-prodinfo'); if (info && (prodName || price)) info.style.display = 'block';
+        var sc = document.getElementById('q-scarcity'), scn = document.getElementById('q-scarcity-n');
+        if (sc && scn && prodName) { scn.textContent = scarcityCount(prodName); sc.style.display = 'flex'; }
+        var seals = document.getElementById('q-seals'); if (seals) seals.style.display = 'flex';
+        btn.style.display = findStoreBuyBtn() ? 'flex' : 'none';
+        btn.onclick = buyNow;
+    }
     const SIZES_TOP = ['XXP', 'XP', 'P', 'M', 'G', 'XG', 'XXG', '3XG', '4XG', '5XG'];
     const SIZES_BOTTOM = ['36/XXP', '38/XP', '40/P', '42/M', '44/G', '46/XG', '48/XXG', '50/3XG', '52/4XG', '54/5XG'];
     const SIZES_BOTTOM_SW = ['XXP', 'XP', 'P', 'M', 'G', 'XG', 'XXG', '3XG', '4XG', '5XG'];
@@ -176,6 +238,39 @@
             --font-body: inherit;
         }
 
+        /* CTA de compra no resultado (igual Gava/Cacife) */
+        .q-btn-buy-now {
+            width: 100%; padding: 16px 18px;
+            background: var(--c-ink); color: #fff; border: 1px solid var(--c-ink);
+            border-radius: 14px; font-family: var(--font-body);
+            font-weight: 700; font-size: 15px; letter-spacing: .3px; cursor: pointer;
+            display: flex; align-items: center; justify-content: center; gap: 8px;
+            transition: opacity .2s; box-sizing: border-box; line-height: 1.2;
+            text-decoration: none;
+        }
+        .q-btn-buy-now:hover { opacity: .85; }
+        .q-card-ia.is-result #q-retry-btn,
+        .q-card-ia.is-result #q-provas-restantes-result { display: none !important; }
+        .q-card-ia.is-result #q-btn-back { display: none !important; }
+        #q-buy-success { display: none; flex-direction: column; gap: 10px; }
+        .q-buy-ok-msg {
+            display: flex; align-items: center; justify-content: center; gap: 8px;
+            background: #e8f5e9; color: #1b7e2e; border: 1px solid #b6e0bd;
+            border-radius: 14px; padding: 14px 16px; font-family: var(--font-body);
+            font-weight: 700; font-size: 14.5px; line-height: 1.3; text-align: center;
+        }
+        .q-buy-ok-msg i { font-size: 20px; }
+        .q-result-prodinfo { text-align: left; margin-bottom: 10px; }
+        .q-result-prodname { font-family: var(--font-body); font-size: 20px; font-weight: 700; color: var(--c-ink); line-height: 1.25; margin-bottom: 6px; }
+        .q-result-prodprice { font-family: var(--font-display); font-size: 28px; letter-spacing: .5px; font-weight: 700; color: var(--c-ink); line-height: 1; }
+        .q-result-installment { font-family: var(--font-body); font-size: 12px; color: var(--c-muted); margin-top: 4px; letter-spacing: .2px; }
+        .q-scarcity { margin-top: 12px; font-family: var(--font-body); font-size: 13px; font-weight: 700; color: var(--c-danger, #dc2626); letter-spacing: 1.5px; text-transform: uppercase; display: flex; align-items: center; justify-content: flex-start; gap: 6px; }
+        .q-scarcity i { font-size: 15px; }
+        .q-seals { display: flex; justify-content: flex-start; gap: 30px; margin: 8px 0; padding: 12px 0; border-top: 1px solid var(--c-line); border-bottom: 1px solid var(--c-line); }
+        .q-seal { display: flex; align-items: center; gap: 9px; }
+        .q-seal > i { font-size: 24px; color: var(--c-ink); flex-shrink: 0; }
+        .q-seal span { font-family: var(--font-body); font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .6px; line-height: 1.25; color: var(--c-ink); text-align: left; }
+
         /* ── Trigger (selo sobre foto) ── */
         @keyframes q-shake { 0%,50%,100%{transform:rotate(0deg)} 10%,30%{transform:rotate(-10deg)} 20%,40%{transform:rotate(10deg)} }
         @keyframes q-shake-soft { 0%,88%,100%{transform:rotate(0deg)} 92%{transform:rotate(-3deg)} 96%{transform:rotate(3deg)} }
@@ -205,16 +300,16 @@
         /* ── Inline button ── */
         .q-btn-inline-provador {
             display: flex; align-items: center; justify-content: center; gap: 8px;
-            width: 100%; padding: 9px 16px;
-            background: var(--c-grad) !important; color: #fff !important;
-            border: none !important; border-radius: 999px !important;
+            width: 100%; padding: 12px 16px; min-height: 44px;
+            background: transparent !important; color: var(--c-ink) !important;
+            border: 2px solid var(--c-ink) !important; border-radius: 5px !important;
             -webkit-appearance: none; appearance: none;
-            font-family: inherit; font-size: 11px; font-weight: 600; letter-spacing: 1.5px; text-transform: uppercase;
-            cursor: pointer; transition: filter 0.25s, transform 0.1s;
-            box-shadow: 0 4px 14px rgba(27,74,107,0.28);
-            margin-bottom: 10px; box-sizing: border-box;
+            font-family: inherit; font-size: 12px; font-weight: 700; letter-spacing: 1.2px; text-transform: uppercase;
+            cursor: pointer; transition: background 0.2s, color 0.2s, transform 0.1s;
+            box-shadow: none;
+            margin-bottom: 12px; box-sizing: border-box;
         }
-        .q-btn-inline-provador:hover { filter: brightness(1.08); color: #fff !important; }
+        .q-btn-inline-provador:hover { background: var(--c-ink) !important; color: #fff !important; }
         .q-btn-inline-provador:active { transform: translateY(1px); }
         .q-btn-inline-provador svg { width: 14px; height: 14px; flex-shrink: 0; }
 
@@ -745,9 +840,24 @@
                             <img id="q-final-view-img">
                         </div>
                         <div id="q-result-actions-col">
-                            <div id="q-provas-restantes-result" class="q-provas-msg" style="text-align:center;margin-bottom:8px;"></div>
-                            <button class="q-btn-outline" id="q-btn-back">Voltar ao Produto</button>
-                            <button class="q-btn-black q-res-mobile-only" id="q-retry-btn" style="display:flex;align-items:center;justify-content:center;gap:8px;">
+                            <div id="q-provas-restantes-result" class="q-provas-msg" style="display:none;"></div>
+                            <div class="q-result-prodinfo" id="q-result-prodinfo" style="display:none;">
+                                <div class="q-result-prodname" id="q-result-prodname"></div>
+                                <div class="q-result-prodprice" id="q-result-prodprice"></div>
+                                <div class="q-result-installment" id="q-result-installment"></div>
+                                <div class="q-scarcity" id="q-scarcity" style="display:none;"><i class="ph-bold ph-fire"></i> APENAS <strong id="q-scarcity-n"></strong>&nbsp;UNIDADES RESTANTES</div>
+                            </div>
+                            <div class="q-seals" id="q-seals" style="display:none;">
+                                <div class="q-seal"><i class="ph-fill ph-shield-check"></i><span>Compra<br>Segura</span></div>
+                                <div class="q-seal"><i class="ph-fill ph-lock-key"></i><span>Pagamento<br>Seguro</span></div>
+                            </div>
+                            <button class="q-btn-buy-now" id="q-btn-buy-now" style="display:none;">Comprar Agora</button>
+                            <div id="q-buy-success">
+                                <div class="q-buy-ok-msg"><i class="ph ph-check-circle"></i> Produto adicionado ao carrinho!</div>
+                                <a class="q-btn-buy-now" id="q-btn-go-cart" href="/cart/">Ir para o carrinho</a>
+                            </div>
+                            <button class="q-btn-outline" id="q-btn-back" style="display:none;">Voltar ao Produto</button>
+                            <button class="q-btn-black q-res-mobile-only" id="q-retry-btn" style="display:none;">
                                 <i class="ph ph-camera"></i> Tentar outra foto
                             </button>
                             <div id="q-related-products" style="display:none;">
@@ -903,8 +1013,12 @@
         });
 
         // Posiciona acima do botão de compra (WooCommerce: .single_add_to_cart_button dentro de form.cart)
+        const cartForm = document.querySelector('form.cart');
         const buyBtn = document.querySelector('.single_add_to_cart_button, form.cart button[type="submit"], .js-addtocart, .btn-add-to-cart, [data-component="product.add-to-cart"]');
-        if (buyBtn) {
+        if (cartForm) {
+            // acima da linha quantidade+comprar, nunca dentro dela
+            cartForm.parentNode.insertBefore(inlineBtn, cartForm);
+        } else if (buyBtn) {
             buyBtn.parentNode.insertBefore(inlineBtn, buyBtn);
         } else {
             const variantsContainer = document.querySelector('form.cart, .js-product-variants');
@@ -1750,6 +1864,7 @@ const fd = new FormData();
                         document.querySelector('.q-card-ia').classList.add('is-result');
                         plTrackProved((document.getElementById('q-phone') || document.getElementById('mc-phone') || document.querySelector('input[type=tel]') || {}).value);
                         document.getElementById('q-step-result').style.display = 'flex';
+                        try { populateBuyCta(); } catch (e) {}
                         loadRelatedProducts();
                         if (typeof _checkProvasRestantes === 'function') _checkProvasRestantes();
                     } else if (res.status === 401 || res.status === 403) {
